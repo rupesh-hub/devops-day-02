@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: devops-day-02
+
+  profiles:
+    active: dev
+
