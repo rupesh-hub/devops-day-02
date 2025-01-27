@@ -15,7 +15,7 @@ ARG APP_VERSION=1.0.0
 WORKDIR /app
 COPY --from=build /build/target/devops-day-02-*.jar /app/
 
-EXPOSE 8181
+EXPOSE 8080
 
 ENV ACTIVE_PROFILE=${PROFILE}
 ENV JAR_VERSION=${APP_VERSION}
@@ -23,4 +23,4 @@ ENV JAR_VERSION=${APP_VERSION}
 CMD java -jar -Dspring.profiles.active=${ACTIVE_PROFILE} devops-day-02-${JAR_VERSION}.jar
 
 # docker build -t rupesh1997/devops-day-02:1.0.0 -f ../docker/backend/Dockerfile .
-# docker run -p 8181:8181 --name devops-day-02 rupesh1997/devops-day-02clear:1.0.0
+# docker run -p 8080:8080 --name devops-day-02 rupesh1997/devops-day-02:1.0.0
