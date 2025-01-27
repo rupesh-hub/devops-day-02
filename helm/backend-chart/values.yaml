@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: rupesh1997/backend
   pullPolicy: IfNotPresent
-  tag: "1.0.0"
+  tag: "12988150277"
 
 ingress:
   enabled: false
