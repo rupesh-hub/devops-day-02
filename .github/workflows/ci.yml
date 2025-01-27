@@ -1,0 +1,140 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'helm/**'
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    name: Compile
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup java environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '17'
+
+      - name: Compile project
+        run: |
+          cd backend
+          ./mvnw clean compile
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: Unit Tests
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup java environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '17'
+
+      - name: Running unit tests
+        run: |
+          cd backend
+          ./mvnw clean test
+
+  build:
+    runs-on: ubuntu-latest
+    name: Build
+    needs: [ compile, unit-tests ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup java environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '17'
+
+      - name: Build project
+        run: |
+          cd backend
+          ./mvnw clean package
+
+  build-image:
+    runs-on: ubuntu-latest
+    name: Build Docker Image
+    needs: [ build ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup java environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '17'
+
+      - name: Build project
+        run: |
+          cd backend
+          ./mvnw clean package
+
+      - name: Extract project version
+        id: extract_version
+        run: |
+          cd backend
+          echo "VERSION=$(./mvnw -q -Dexec.executable='echo' -Dexec.args='${project.version}' --non-recursive exec:exec)" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to docker hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push image to dockerhub
+        uses: docker/build-push-action@v5
+        with:
+          context: backend
+          file: docker/backend/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ secrets.DOCKER_USERNAME }}/devops-day-02:${{ steps.extract_version.outputs.VERSION }},${{ secrets.DOCKER_USERNAME }}/devops-day-02:${{github.run_id}}
+          build-args: |
+            PROFILE=dev
+            APP_VERSION=${{ steps.extract_version.outputs.VERSION }}
+
+  update-helm:
+    run-on: ubuntu-latest
+    needs: [ build-image ]
+    name: Update helm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.TOKEN }}
+
+      - name: Update tag in helm chart
+        run: |
+          sed -i 's/tag: .*/tag: "${{github.run_id}}"/' helm/backend-chart/values.yaml
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.email "dulalrupesh77@gmail.com"
+          git config --global user.name "Rupesh Dulal"
+          git add helm/backend-chart/values.yaml
+          git commit -m "Update helm chart version to ${{ github.run_id }}"
+          git push origin main
